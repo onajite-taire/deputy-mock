@@ -1,11 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import AnimatedBackground from "@/components/AnimatedBackground";
 import InitiativeBubble from "@/components/InitiativeBubble";
-import WorkflowStepper, { WorkflowStep } from "@/components/WorkflowStepper";
-import DemoControls, { AppState } from "@/components/DemoControls";
+import StepList, { StepItem } from "@/components/StepList";
+import ApprovalChecklist, { ApprovalItem, ItemStatus } from "@/components/ApprovalChecklist";
 import DirectionInput from "@/components/DirectionInput";
-import CompletedTask from "@/components/CompletedTask";
 import SelectableOptions from "@/components/SelectableOptions";
 import {
   WorkflowCard,
@@ -14,127 +13,140 @@ import {
   ConfirmButtons,
 } from "@/components/WorkflowCard";
 
-const initialSteps: WorkflowStep[] = [
-  { id: "intent", label: "Intent", description: "Detect user intent", status: "pending" },
-  { id: "scan", label: "Readiness Scan", description: "Check team preparedness", status: "pending" },
-  { id: "plan", label: "Readiness Plan", description: "Generate action items", status: "pending" },
-  { id: "approval", label: "Approval", description: "Confirm overnight actions", status: "pending" },
-  { id: "missing", label: "Missing Info", description: "Fill knowledge gaps", status: "pending" },
-  { id: "final", label: "Final Check", description: "Verify completion", status: "pending" },
-  { id: "execute", label: "Execute Overnight", description: "Run automated tasks", status: "pending" },
+type FlowPhase = "ambient" | "processing" | "approval" | "overnight";
+
+const initialSteps: StepItem[] = [
+  { id: "intent", label: "Intent captured: Prepare Pricing v2 Launch for Tokyo", status: "pending" },
+  { id: "scan", label: "Readiness scan: identify blockers", status: "pending" },
+  { id: "plan", label: "Readiness plan: propose minimal actions", status: "pending" },
+  { id: "approval", label: "Approval required", status: "pending" },
 ];
 
-interface ApprovalItem {
-  label: string;
-  checked: boolean;
-  confidence: number;
-  completed: boolean;
-}
+const initialApprovalItems: ApprovalItem[] = [
+  { id: "deploy", label: "Deploy pricing update to staging-v2", confidence: 94, status: "pending" },
+  { id: "review", label: "Review Kenji's schema changes", confidence: 87, status: "pending" },
+  { id: "preanswer", label: "Pre-answer: Why Stripe?", confidence: 91, status: "pending" },
+];
 
 const Index = () => {
-  const [appState, setAppState] = useState<AppState>("ambient");
+  const [phase, setPhase] = useState<FlowPhase>("ambient");
   const [showBubble, setShowBubble] = useState(false);
-  const [steps, setSteps] = useState<WorkflowStep[]>(initialSteps);
-  const [activeStep, setActiveStep] = useState(0);
-  const [showCards, setShowCards] = useState<string[]>([]);
-  const [approvalItems, setApprovalItems] = useState<ApprovalItem[]>([
-    { label: "Deploy pricing update to staging-v2", checked: true, confidence: 94, completed: false },
-    { label: "Review Kenji's schema changes", checked: true, confidence: 87, completed: false },
-    { label: "Pre-answer: Why Stripe?", checked: true, confidence: 91, completed: false },
-  ]);
-  const [isOvernight, setIsOvernight] = useState(false);
+  const [steps, setSteps] = useState<StepItem[]>(initialSteps);
+  const [approvalItems, setApprovalItems] = useState<ApprovalItem[]>(initialApprovalItems);
+  const [visibleCards, setVisibleCards] = useState<string[]>([]);
   const [missingSelections, setMissingSelections] = useState<Record<string, string>>({});
+  const [showFinalCard, setShowFinalCard] = useState(false);
+  const timeoutsRef = useRef<NodeJS.Timeout[]>([]);
 
-  // Show bubble immediately
+  // Cleanup timeouts on unmount
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setShowBubble(true);
-    }, 300);
+    return () => {
+      timeoutsRef.current.forEach(clearTimeout);
+    };
+  }, []);
+
+  // Show bubble after brief delay
+  useEffect(() => {
+    const timer = setTimeout(() => setShowBubble(true), 300);
     return () => clearTimeout(timer);
   }, []);
 
-  // Handle state changes and animate workflow
-  useEffect(() => {
-    if (appState === "ambient") {
-      setSteps(initialSteps);
-      setActiveStep(0);
-      setShowCards([]);
-      setIsOvernight(false);
-      setApprovalItems(prev => prev.map(item => ({ ...item, completed: false })));
-      setMissingSelections({});
-    } else if (appState === "intent") {
-      // Animate through scan and plan steps automatically
-      animateSteps(0, 2);
-    } else if (appState === "approval") {
-      // Complete all steps and show all cards
-      animateSteps(0, 6, true);
-    }
-  }, [appState]);
+  const clearAllTimeouts = () => {
+    timeoutsRef.current.forEach(clearTimeout);
+    timeoutsRef.current = [];
+  };
 
-  const animateSteps = (start: number, end: number, showAllCards = false) => {
-    let current = start;
-    
-    const interval = setInterval(() => {
-      if (current <= end) {
-        setSteps(prev => prev.map((step, i) => ({
-          ...step,
-          status: i < current ? "complete" : i === current ? "running" : "pending"
-        })));
-        setActiveStep(current);
-
-        // Show cards based on step
-        const cardOrder = ["intent", "scan", "plan", "approval", "missing", "final"];
-        if (showAllCards || current <= 2) {
-          if (current >= 0 && current <= 5) {
-            setShowCards(prev => [...new Set([...prev, cardOrder[current]])]);
-          }
-        }
-
-        current++;
-      } else {
-        clearInterval(interval);
-        setSteps(prev => prev.map((step, i) => ({
-          ...step,
-          status: i <= end ? "complete" : "pending"
-        })));
-      }
-    }, 500);
-
-    return () => clearInterval(interval);
+  const addTimeout = (fn: () => void, delay: number) => {
+    const id = setTimeout(fn, delay);
+    timeoutsRef.current.push(id);
+    return id;
   };
 
   const handleBubbleClick = () => {
-    if (appState === "ambient") {
-      setAppState("intent");
-    }
+    if (phase !== "ambient") return;
+    
+    setPhase("processing");
+    runAutomaticFlow();
   };
 
-  const handleApproveAll = () => {
-    // Animate completion of approval items
-    approvalItems.forEach((_, index) => {
-      setTimeout(() => {
-        setApprovalItems(prev => prev.map((item, i) => 
-          i === index ? { ...item, completed: true } : item
-        ));
-      }, index * 400);
+  const runAutomaticFlow = () => {
+    clearAllTimeouts();
+    
+    // Step timings (ms) - each step: running → complete
+    const stepDurations = [800, 900, 1000, 700];
+    let cumulative = 0;
+
+    // Animate each step through running → complete
+    steps.forEach((step, index) => {
+      // Set to running
+      addTimeout(() => {
+        setSteps(prev => prev.map((s, i) => ({
+          ...s,
+          status: i === index ? "running" : i < index ? "complete" : "pending"
+        })));
+      }, cumulative);
+
+      // Set to complete and show corresponding card
+      addTimeout(() => {
+        setSteps(prev => prev.map((s, i) => ({
+          ...s,
+          status: i <= index ? "complete" : "pending"
+        })));
+
+        // Show card based on step
+        if (index === 0) setVisibleCards(prev => [...prev, "intent"]);
+        if (index === 1) setVisibleCards(prev => [...prev, "scan"]);
+        if (index === 2) setVisibleCards(prev => [...prev, "plan"]);
+        if (index === 3) {
+          setVisibleCards(prev => [...prev, "approval"]);
+          setPhase("approval");
+        }
+      }, cumulative + stepDurations[index]);
+
+      cumulative += stepDurations[index] + 100;
     });
   };
 
-  const handleConfirm = () => {
-    setIsOvernight(true);
+  const handleApproveAll = () => {
+    // Animate each approval item: running → complete with cross-out
+    approvalItems.forEach((_, index) => {
+      // Set to running
+      addTimeout(() => {
+        setApprovalItems(prev => prev.map((item, i) => ({
+          ...item,
+          status: i === index ? "running" : i < index ? "complete" : "pending"
+        })));
+      }, index * 500);
+
+      // Set to complete
+      addTimeout(() => {
+        setApprovalItems(prev => prev.map((item, i) => ({
+          ...item,
+          status: i <= index ? "complete" : "pending"
+        })));
+      }, index * 500 + 400);
+    });
+
+    // Show final card after all items complete
+    addTimeout(() => {
+      setShowFinalCard(true);
+    }, approvalItems.length * 500 + 600);
   };
 
-  const showDirectionInput = showCards.includes("approval") || showCards.includes("missing");
+  const handleConfirm = () => {
+    setPhase("overnight");
+  };
+
+  const showDirectionInput = phase === "approval" && !showFinalCard;
 
   return (
     <div className="min-h-screen bg-background overflow-hidden relative">
       <AnimatedBackground />
 
-      {/* Main content */}
       <div className="relative z-10 min-h-screen">
         <AnimatePresence mode="wait">
-          {appState === "ambient" ? (
-            /* State 0: Ambient Start */
+          {phase === "ambient" ? (
+            /* Ambient Start */
             <motion.div
               key="ambient"
               initial={{ opacity: 0 }}
@@ -147,10 +159,7 @@ const Index = () => {
                 <motion.div
                   initial={{ scale: 0, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
-                  transition={{ 
-                    duration: 0.6, 
-                    ease: [0.34, 1.56, 0.64, 1] 
-                  }}
+                  transition={{ duration: 0.6, ease: [0.34, 1.56, 0.64, 1] }}
                   className="flex flex-col items-center gap-8"
                 >
                   <InitiativeBubble
@@ -169,7 +178,7 @@ const Index = () => {
                 </motion.div>
               )}
             </motion.div>
-          ) : isOvernight ? (
+          ) : phase === "overnight" ? (
             /* Overnight State */
             <motion.div
               key="overnight"
@@ -199,7 +208,7 @@ const Index = () => {
               </motion.div>
             </motion.div>
           ) : (
-            /* State 1 & 2: Intent / Approval */
+            /* Processing / Approval State */
             <motion.div
               key="workflow"
               initial={{ opacity: 0 }}
@@ -210,8 +219,9 @@ const Index = () => {
             >
               {/* Left column - Bubble */}
               <motion.div
-                initial={{ x: 0 }}
-                animate={{ x: 0 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.1 }}
                 className="w-2/5 flex flex-col items-center justify-center p-8 border-r border-white/5"
               >
                 <motion.div
@@ -221,23 +231,23 @@ const Index = () => {
                 >
                   <InitiativeBubble
                     initiative="Pricing v2 Launch"
-                    status={appState === "intent" ? "Processing" : "Ready"}
+                    status={phase === "processing" ? "Processing" : "Ready"}
                     size="medium"
                   />
                 </motion.div>
               </motion.div>
 
-              {/* Right column - Workflow Dashboard */}
+              {/* Right column - Workflow */}
               <motion.div
-                initial={{ opacity: 0, x: 40 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.2, duration: 0.4 }}
+                initial={{ opacity: 0, x: 40, filter: "blur(10px)" }}
+                animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+                transition={{ delay: 0.15, duration: 0.5 }}
                 className="flex-1 flex flex-col"
               >
                 <div className="flex-1 p-8 overflow-auto pb-32">
                   <div className="max-w-xl mx-auto space-y-6">
                     {/* Header */}
-                    <div className="flex items-center justify-between mb-8">
+                    <div className="flex items-center justify-between mb-6">
                       <div>
                         <h2 className="text-sm font-medium text-white/90">
                           Initiative Readiness
@@ -247,19 +257,18 @@ const Index = () => {
                         </p>
                       </div>
                       <span className="px-3 py-1 rounded-full text-[10px] uppercase tracking-wider bg-white/10 text-white/70">
-                        In progress
+                        {phase === "processing" ? "Scanning" : "Awaiting approval"}
                       </span>
                     </div>
 
-                    {/* Stepper */}
+                    {/* Step List - Primary progress UI */}
                     <div className="glass rounded-2xl p-4">
-                      <WorkflowStepper steps={steps} activeStep={activeStep} />
+                      <StepList steps={steps} />
                     </div>
 
                     {/* Dynamic Cards */}
                     <AnimatePresence mode="popLayout">
-                      {/* Intent Card - Agent detected */}
-                      {showCards.includes("intent") && (
+                      {visibleCards.includes("intent") && (
                         <WorkflowCard 
                           title="Detected intent" 
                           delay={0}
@@ -271,7 +280,7 @@ const Index = () => {
                         </WorkflowCard>
                       )}
 
-                      {showCards.includes("scan") && (
+                      {visibleCards.includes("scan") && (
                         <WorkflowCard title="Readiness Scan" delay={0}>
                           <BulletList
                             items={[
@@ -283,60 +292,23 @@ const Index = () => {
                         </WorkflowCard>
                       )}
 
-                      {showCards.includes("plan") && (
+                      {visibleCards.includes("plan") && (
                         <WorkflowCard title="Minimal Readiness Plan" delay={0.1}>
-                          <div className="space-y-2">
-                            {approvalItems.map((item, i) => (
-                              <CompletedTask
-                                key={i}
-                                label={item.label}
-                                completed={item.completed}
-                                confidence={item.confidence}
-                                delay={i * 0.05}
-                              />
-                            ))}
-                          </div>
+                          <ApprovalChecklist items={approvalItems} />
                           <div className="flex items-center gap-1.5 text-[10px] text-white/40 mt-3">
                             <span>ETA before Tokyo wakes: 2h 10m</span>
                           </div>
                         </WorkflowCard>
                       )}
 
-                      {showCards.includes("approval") && (
+                      {visibleCards.includes("approval") && !showFinalCard && (
                         <WorkflowCard title="Approve overnight actions?" delay={0.2}>
-                          <ApprovalButtons 
-                            onApprove={handleApproveAll}
-                          />
+                          <ApprovalButtons onApprove={handleApproveAll} />
                         </WorkflowCard>
                       )}
 
-                      {showCards.includes("missing") && (
-                        <WorkflowCard title="Missing info" delay={0.3}>
-                          <div className="space-y-4">
-                            <SelectableOptions
-                              question="Which staging environment?"
-                              options={[
-                                { value: "staging-v2", label: "staging-v2", recommended: true },
-                                { value: "staging-main", label: "staging-main" },
-                              ]}
-                              selectedValue={missingSelections.staging}
-                              onSelect={(v) => setMissingSelections(prev => ({ ...prev, staging: v }))}
-                            />
-                            <SelectableOptions
-                              question="Any restrictions tonight?"
-                              options={[
-                                { value: "no-prod", label: "No production deploy", recommended: true },
-                                { value: "none", label: "No restrictions" },
-                              ]}
-                              selectedValue={missingSelections.restrictions}
-                              onSelect={(v) => setMissingSelections(prev => ({ ...prev, restrictions: v }))}
-                            />
-                          </div>
-                        </WorkflowCard>
-                      )}
-
-                      {showCards.includes("final") && (
-                        <WorkflowCard title="Initiative ready" delay={0.4}>
+                      {showFinalCard && (
+                        <WorkflowCard title="Initiative ready" delay={0.1}>
                           <div className="space-y-3">
                             <div className="space-y-1.5">
                               <p className="text-xs text-white/70">
@@ -374,9 +346,6 @@ const Index = () => {
           )}
         </AnimatePresence>
       </div>
-
-      {/* Demo Controls */}
-      <DemoControls currentState={appState} onStateChange={setAppState} />
     </div>
   );
 };
