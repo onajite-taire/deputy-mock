@@ -1,6 +1,5 @@
 import { motion } from "framer-motion";
 import { Check, Clock } from "lucide-react";
-import CompletedTask from "./CompletedTask";
 import SelectableOptions from "./SelectableOptions";
 
 interface WorkflowCardProps {
@@ -45,32 +44,6 @@ export const BulletList = ({ items }: BulletListProps) => (
       </li>
     ))}
   </ul>
-);
-
-interface ApprovalChecklistItem {
-  label: string;
-  checked: boolean;
-  confidence?: number;
-  completed?: boolean;
-}
-
-interface ApprovalChecklistProps {
-  items: ApprovalChecklistItem[];
-  onToggle?: (index: number) => void;
-}
-
-export const ApprovalChecklist = ({ items, onToggle }: ApprovalChecklistProps) => (
-  <div className="space-y-2">
-    {items.map((item, i) => (
-      <CompletedTask
-        key={i}
-        label={item.label}
-        completed={item.completed}
-        confidence={item.confidence}
-        delay={i * 0.1}
-      />
-    ))}
-  </div>
 );
 
 interface ChecklistItem {
