@@ -1,13 +1,16 @@
 import { motion } from "framer-motion";
 import { Check, Clock } from "lucide-react";
+import CompletedTask from "./CompletedTask";
+import SelectableOptions from "./SelectableOptions";
 
 interface WorkflowCardProps {
   title: string;
   children: React.ReactNode;
   delay?: number;
+  status?: string;
 }
 
-export const WorkflowCard = ({ title, children, delay = 0 }: WorkflowCardProps) => {
+export const WorkflowCard = ({ title, children, delay = 0, status }: WorkflowCardProps) => {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -15,7 +18,15 @@ export const WorkflowCard = ({ title, children, delay = 0 }: WorkflowCardProps) 
       transition={{ delay, duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
       className="glass-strong rounded-2xl p-5 space-y-4"
     >
-      <h4 className="text-sm font-medium text-white/90">{title}</h4>
+      <div className="flex items-center justify-between">
+        <h4 className="text-sm font-medium text-white/90">{title}</h4>
+        {status && (
+          <span className="flex items-center gap-1 text-[10px] text-white/50">
+            <Check className="w-3 h-3" />
+            {status}
+          </span>
+        )}
+      </div>
       {children}
     </motion.div>
   );
@@ -34,6 +45,32 @@ export const BulletList = ({ items }: BulletListProps) => (
       </li>
     ))}
   </ul>
+);
+
+interface ApprovalChecklistItem {
+  label: string;
+  checked: boolean;
+  confidence?: number;
+  completed?: boolean;
+}
+
+interface ApprovalChecklistProps {
+  items: ApprovalChecklistItem[];
+  onToggle?: (index: number) => void;
+}
+
+export const ApprovalChecklist = ({ items, onToggle }: ApprovalChecklistProps) => (
+  <div className="space-y-2">
+    {items.map((item, i) => (
+      <CompletedTask
+        key={i}
+        label={item.label}
+        completed={item.completed}
+        confidence={item.confidence}
+        delay={i * 0.1}
+      />
+    ))}
+  </div>
 );
 
 interface ChecklistItem {
@@ -78,11 +115,11 @@ export const Checklist = ({ items, eta }: ChecklistProps) => (
 
 interface ApprovalButtonsProps {
   onApprove?: () => void;
-  onChoose?: () => void;
-  onDeny?: () => void;
+  onEdit?: () => void;
+  onCancel?: () => void;
 }
 
-export const ApprovalButtons = ({ onApprove, onChoose, onDeny }: ApprovalButtonsProps) => (
+export const ApprovalButtons = ({ onApprove, onEdit, onCancel }: ApprovalButtonsProps) => (
   <div className="flex gap-2">
     <button
       onClick={onApprove}
@@ -92,68 +129,36 @@ export const ApprovalButtons = ({ onApprove, onChoose, onDeny }: ApprovalButtons
       Approve all
     </button>
     <button
-      onClick={onChoose}
+      onClick={onEdit}
       className="flex-1 py-2 px-4 rounded-xl bg-white/5 text-white/60 text-xs font-medium
         hover:bg-white/10 transition-all duration-200"
     >
-      Choose
+      Edit selection
     </button>
     <button
-      onClick={onDeny}
+      onClick={onCancel}
       className="flex-1 py-2 px-4 rounded-xl bg-white/5 text-white/40 text-xs font-medium
         hover:bg-white/10 transition-all duration-200"
     >
-      Deny
+      Cancel
     </button>
   </div>
 );
 
 interface ConfirmButtonsProps {
   onConfirm?: () => void;
-  onNotYet?: () => void;
+  label?: string;
 }
 
-export const ConfirmButtons = ({ onConfirm, onNotYet }: ConfirmButtonsProps) => (
-  <div className="flex gap-2">
-    <button
-      onClick={onConfirm}
-      className="flex-1 py-2.5 px-4 rounded-xl bg-white text-black text-xs font-medium
-        hover:bg-white/90 transition-all duration-200"
-    >
-      Confirm
-    </button>
-    <button
-      onClick={onNotYet}
-      className="flex-1 py-2.5 px-4 rounded-xl bg-white/5 text-white/60 text-xs font-medium
-        hover:bg-white/10 transition-all duration-200"
-    >
-      Not yet
-    </button>
-  </div>
+export const ConfirmButtons = ({ onConfirm, label = "Confirm and execute overnight" }: ConfirmButtonsProps) => (
+  <button
+    onClick={onConfirm}
+    className="w-full py-3 px-4 rounded-xl bg-white text-black text-xs font-medium
+      hover:bg-white/90 transition-all duration-200"
+  >
+    {label}
+  </button>
 );
 
-interface VoiceResponseProps {
-  speaker: string;
-  text: string;
-}
-
-export const VoiceResponse = ({ speaker, text }: VoiceResponseProps) => (
-  <div className="text-xs text-white/50 pt-2 border-t border-white/5">
-    <span className="text-white/30">{speaker}:</span>{" "}
-    <span className="text-white/60 italic">"{text}"</span>
-  </div>
-);
-
-interface QuestionListProps {
-  questions: string[];
-}
-
-export const QuestionList = ({ questions }: QuestionListProps) => (
-  <ul className="space-y-2">
-    {questions.map((q, i) => (
-      <li key={i} className="text-xs text-white/60 pl-3 border-l-2 border-white/10">
-        {q}
-      </li>
-    ))}
-  </ul>
-);
+// Re-export for convenience
+export { SelectableOptions };
