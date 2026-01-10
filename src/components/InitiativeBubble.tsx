@@ -5,13 +5,19 @@ interface InitiativeBubbleProps {
   status: string;
   size?: "large" | "medium";
   className?: string;
+  onClick?: () => void;
+  clickable?: boolean;
+  settled?: boolean;
 }
 
 const InitiativeBubble = ({ 
   initiative, 
   status, 
   size = "large",
-  className = "" 
+  className = "",
+  onClick,
+  clickable = false,
+  settled = false
 }: InitiativeBubbleProps) => {
   const sizeClasses = {
     large: "w-64 h-64",
@@ -20,16 +26,19 @@ const InitiativeBubble = ({
 
   return (
     <motion.div
-      className={`relative ${sizeClasses[size]} ${className}`}
-      animate={{ y: [0, -8, 0] }}
+      className={`relative ${sizeClasses[size]} ${className} ${clickable ? 'cursor-pointer' : ''}`}
+      animate={{ y: [0, settled ? -4 : -8, 0] }}
       transition={{
-        duration: 6,
+        duration: settled ? 8 : 6,
         repeat: Infinity,
         ease: "easeInOut",
       }}
+      onClick={onClick}
+      whileHover={clickable ? { scale: 1.02 } : {}}
+      whileTap={clickable ? { scale: 0.98 } : {}}
     >
       {/* Outer glow */}
-      <div className="absolute inset-0 rounded-full bubble-gradient blur-2xl opacity-50" />
+      <div className={`absolute inset-0 rounded-full bubble-gradient blur-2xl transition-opacity duration-1000 ${settled ? 'opacity-30' : 'opacity-50'}`} />
       
       {/* Main bubble */}
       <div className="relative w-full h-full rounded-full bubble-gradient glass-strong glow-bubble overflow-hidden">
@@ -56,11 +65,27 @@ const InitiativeBubble = ({
             rotate: [0, 360],
           }}
           transition={{
-            duration: 20,
+            duration: settled ? 30 : 20,
             repeat: Infinity,
             ease: "linear",
           }}
         />
+        
+        {/* Click hint ring */}
+        {clickable && (
+          <motion.div
+            className="absolute inset-0 rounded-full border border-white/10"
+            animate={{
+              scale: [1, 1.05, 1],
+              opacity: [0.5, 0.2, 0.5],
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeInOut",
+            }}
+          />
+        )}
       </div>
     </motion.div>
   );

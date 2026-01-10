@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { 
-  Mic, 
+  Sparkles,
   Search, 
   ClipboardList, 
   CheckCircle2, 
@@ -25,7 +25,7 @@ interface WorkflowStepperProps {
 }
 
 const stepIcons: Record<string, React.ComponentType<{ className?: string }>> = {
-  intent: Mic,
+  intent: Sparkles,
   scan: Search,
   plan: ClipboardList,
   approval: CheckCircle2,
