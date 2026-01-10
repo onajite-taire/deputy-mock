@@ -6,6 +6,7 @@ import StepList, { StepItem } from "@/components/StepList";
 import ApprovalChecklist, { ApprovalItem, ItemStatus } from "@/components/ApprovalChecklist";
 import DirectionInput from "@/components/DirectionInput";
 import SelectableOptions from "@/components/SelectableOptions";
+import MorningView from "@/components/MorningView";
 import {
   WorkflowCard,
   BulletList,
@@ -13,7 +14,7 @@ import {
   ConfirmButtons,
 } from "@/components/WorkflowCard";
 
-type FlowPhase = "ambient" | "processing" | "approval" | "overnight";
+type FlowPhase = "ambient" | "processing" | "approval" | "overnight" | "transition" | "morning";
 
 const initialSteps: StepItem[] = [
   { id: "intent", label: "Intent captured: Prepare Pricing v2 Launch for Tokyo", status: "pending" },
@@ -135,6 +136,16 @@ const Index = () => {
 
   const handleConfirm = () => {
     setPhase("overnight");
+    
+    // Start transition to morning after overnight state shows
+    addTimeout(() => {
+      setPhase("transition");
+    }, 3000);
+    
+    // Complete transition to morning view
+    addTimeout(() => {
+      setPhase("morning");
+    }, 10000);
   };
 
   const showDirectionInput = phase === "approval" && !showFinalCard;
@@ -178,35 +189,75 @@ const Index = () => {
                 </motion.div>
               )}
             </motion.div>
-          ) : phase === "overnight" ? (
-            /* Overnight State */
+          ) : phase === "overnight" || phase === "transition" ? (
+            /* Overnight / Transition State */
             <motion.div
               key="overnight"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.8 }}
-              className="min-h-screen flex flex-col items-center justify-center px-6"
+              className="min-h-screen flex flex-col items-center justify-center px-6 relative"
             >
+              {/* Gradient overlay for time passage effect */}
+              {phase === "transition" && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 3 }}
+                  className="absolute inset-0 pointer-events-none"
+                  style={{
+                    background: "linear-gradient(90deg, transparent 0%, hsl(30 40% 10% / 0.3) 50%, hsl(40 50% 15% / 0.2) 100%)",
+                  }}
+                />
+              )}
+
               <motion.div
                 initial={{ scale: 0.9 }}
-                animate={{ scale: 1 }}
-                transition={{ duration: 0.6 }}
+                animate={{ 
+                  scale: phase === "transition" ? 0.8 : 1,
+                  opacity: phase === "transition" ? 0.6 : 1,
+                }}
+                transition={{ duration: phase === "transition" ? 4 : 0.6 }}
                 className="flex flex-col items-center gap-8"
               >
-                <InitiativeBubble
-                  initiative="Pricing v2 Launch"
-                  status="Running overnight"
-                  settled
-                />
+                <motion.div
+                  animate={{ 
+                    opacity: phase === "transition" ? [1, 0] : 1,
+                  }}
+                  transition={{ 
+                    duration: phase === "transition" ? 6 : 0,
+                    delay: phase === "transition" ? 1 : 0,
+                  }}
+                >
+                  <InitiativeBubble
+                    initiative="Pricing v2 Launch"
+                    status="Running overnight"
+                    settled
+                  />
+                </motion.div>
 
-                <div className="text-center space-y-2">
-                  <h1 className="text-sm font-medium text-white/70">In progress</h1>
+                <motion.div 
+                  className="text-center space-y-2"
+                  animate={{ 
+                    opacity: phase === "transition" ? [1, 0] : 1,
+                  }}
+                  transition={{ 
+                    duration: phase === "transition" ? 4 : 0,
+                    delay: phase === "transition" ? 0 : 0,
+                  }}
+                >
+                  <h1 className="text-sm font-medium text-white/70">
+                    {phase === "transition" ? "Working overnight…" : "In progress"}
+                  </h1>
                   <p className="text-xs text-white/40">
                     Tokyo will wake up unblocked.
                   </p>
-                </div>
+                </motion.div>
               </motion.div>
             </motion.div>
+          ) : phase === "morning" ? (
+            /* Morning View - Kenji's perspective */
+            <MorningView />
           ) : (
             /* Processing / Approval State */
             <motion.div
