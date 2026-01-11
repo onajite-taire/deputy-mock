@@ -8,7 +8,7 @@ import { StatusBadge } from '@/components/StatusBadge';
 import InitiativeBubble from '@/components/InitiativeBubble';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Send, Rocket, FileSearch, HelpCircle, Clock } from 'lucide-react';
+import { Loader2, Rocket, FileSearch, HelpCircle, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 
 const placeholders: Record<HandoffType, string> = {
@@ -17,10 +17,10 @@ const placeholders: Record<HandoffType, string> = {
   answer: 'Answer: Why did we choose Stripe?',
 };
 
-const typeIcons: Record<HandoffType, typeof Rocket> = {
-  deploy: Rocket,
-  review: FileSearch,
-  answer: HelpCircle,
+const typeConfig: Record<HandoffType, { icon: typeof Rocket; label: string }> = {
+  deploy: { icon: Rocket, label: 'Deploy' },
+  review: { icon: FileSearch, label: 'Review' },
+  answer: { icon: HelpCircle, label: 'Answer' },
 };
 
 export default function Create() {
@@ -115,8 +115,11 @@ export default function Create() {
             </>
           ) : (
             <>
-              <Send className="w-5 h-5 mr-2" />
-              Create Handoff
+              {(() => {
+                const Icon = typeConfig[type].icon;
+                return <Icon className="w-5 h-5 mr-2" />;
+              })()}
+              Create {typeConfig[type].label} Handoff
             </>
           )}
         </Button>
@@ -145,7 +148,7 @@ export default function Create() {
         ) : (
           <div className="space-y-3">
             {activeHandoffs.map((handoff) => {
-              const Icon = typeIcons[handoff.type];
+              const Icon = typeConfig[handoff.type].icon;
               return (
                 <div
                   key={handoff.handoff_id}
