@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import type { Handoff, HandoffType } from '@/types/handoff';
+import { useHandoffStatus } from '@/hooks/useHandoffStatus';
 import { StatusBadge } from './StatusBadge';
-import { ChevronDown, ChevronUp, Rocket, FileSearch, HelpCircle, Clock, Lightbulb } from 'lucide-react';
+import { ChevronDown, ChevronUp, Rocket, FileSearch, HelpCircle, Clock, Lightbulb, Loader2 } from 'lucide-react';
 
 interface HandoffCardProps {
   handoff: Handoff;
@@ -27,9 +28,13 @@ function formatDateTime(isoString?: string): string {
 
 export function HandoffCard({ handoff }: HandoffCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const { data: status, isLoading } = useHandoffStatus(handoff.handoff_id, handoff.status);
   const config = typeConfig[handoff.type];
   const Icon = config.icon;
-  const result = handoff.result;
+
+  // Use status data for result and completed_at
+  const result = status?.result ?? handoff.result;
+  const completedAt = status?.completed_at ?? handoff.completed_at;
 
   return (
     <div className="rounded-xl border border-gray-800 bg-gray-900/80 backdrop-blur-sm overflow-hidden">
@@ -49,21 +54,23 @@ export function HandoffCard({ handoff }: HandoffCardProps) {
               <Icon className="w-3 h-3" />
               {config.label}
             </span>
-            {handoff.completed_at && (
+            {completedAt && (
               <span className="flex items-center gap-1">
                 <Clock className="w-3 h-3" />
-                {formatDateTime(handoff.completed_at)}
+                {formatDateTime(completedAt)}
               </span>
             )}
           </div>
         </div>
 
-        {/* Summary preview */}
-        {result?.summary && !isExpanded && (
+        {/* Summary preview or loading */}
+        {isLoading && !result ? (
+          <Loader2 className="w-4 h-4 animate-spin text-gray-500 hidden md:block" />
+        ) : result?.summary && !isExpanded ? (
           <p className="hidden md:block text-sm text-gray-400 max-w-xs truncate">
             {result.summary}
           </p>
-        )}
+        ) : null}
 
         {/* Expand icon */}
         {isExpanded ? (
